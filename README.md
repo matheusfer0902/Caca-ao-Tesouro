@@ -1,41 +1,71 @@
-# Caça ao Tesouro
+# Caça ao Tesouro 3D
 
-**Número da Lista**: 1<br>
-**Conteúdo da Disciplina**: Grafos 1 <br>
+**Conteúdo da Disciplina**: Grafos 1
 
-## Alunos
-|Matrícula | Aluno |
-| -- | -- |
-| 19/0057858  |  José Luís Ramos Teixeira |
-| 19/0038900  |  Victor de Souza Cabral |
+## Sobre
 
-## Sobre 
-O objetivo deste projeto é criar um jogo em que o usuário posiciona em um mapa (grid) de quadrados um navio no ponto de início e um tesouro no ponto de destino. A partir disso, o programa utiliza o algoritmo Breadth First Search (BFS) ou Depth First Search (DFS) para encontrar o caminho do navio até o tesouro.
+Simulador interativo de busca cega em grade 3D. O usuário posiciona um navio (início) e um tesouro (destino) no mapa, e o programa executa **BFS** ou **DFS** com animação passo a passo, mostrando fronteira, nós visitados e caminho final.
 
-O programa possui as funções de escolher o número de obstáculos, embaralhar eles, alterar o tamanho do grid para um máximo de 20x20, selecionar o tipo de busca e informar o número de passos que foram precisos para se chegar no baú.
+- **BFS (Breadth First Search)**: usa fila e encontra o caminho com **menor número de passos**.
+- **DFS (Depth First Search)**: usa pilha e encontra **um caminho válido**, não necessariamente o mais curto.
 
-## Screenshots
+## Stack
 
-<img src="assets/caca-tesouro_logo.png" style="display: block; margin-left: auto; margin-right: auto; width: 30%;">
-<img src="assets/caca-tesouro_tudo.jpg" style="display: block; margin-left: auto; margin-right: auto; width: 70%;">
-<img src="assets/caca-tesouro_guia.png" style="display: block; margin-left: auto; margin-right: auto; width: 50%;">
-<img src="assets/caca-tesouro_controles.png" style="display: block; margin-left: auto; margin-right: auto; width: 50%;">
-<img src="assets/caca-tesouro_grid.png" style="display: block; margin-left: auto; margin-right: auto; width: 50%;">
+- [Vite](https://vitejs.dev/) — build e dev server
+- [React 19](https://react.dev/)
+- [Three.js](https://threejs.org/) + [React Three Fiber](https://docs.pmnd.rs/react-three-fiber) + [Drei](https://github.com/pmndrs/drei)
 
-## Vídeo de Apresentação
+## Instalação
 
-<a href="https://www.youtube.com/watch?v=L_0gyZoNA6s" target="_blank">
-  <img src="assets/link_video.png" alt="Apresentação">
-</a>
+```bash
+npm install
+```
 
-## Instalação 
-**Linguagem**: HTML, CSS e JavaScript<br>
-**Framework**: Não há necessidade de instalar nenhum framework. Para rodar o projeto, basta clonar o repositório e abrir o arquivo index.html no navegador ou acessar o link.<br>
+## Desenvolvimento
 
-## Uso 
-Acessar o link <https://projeto-de-algoritmos.github.io/Grafos1_Caca-Tesouro/>
+```bash
+npm run dev
+```
 
-Após abrir no navegador, o usuário pode selecionar o navio e o tesouro clicando em dois quadrados no mapa. O programa irá então calcular o caminho mais curto utilizando o algoritmo BFS ou DFS e exibir o caminho no mapa. 
+Abra a URL exibida no terminal (geralmente `http://localhost:5173`).
 
-## Outros 
-Este projeto foi criado como parte do curso de Projeto de Algoritmos da Fcauldade do Gama - Universidade de Brasília (FGA-UnB). Qualquer sugestão ou contribuição é bem-vinda.
+## Build
+
+```bash
+npm run build
+npm run preview
+```
+
+Os arquivos estáticos ficam em `dist/`.
+
+## Deploy (GitHub Pages)
+
+O `vite.config.js` usa `base: './'` para paths relativos. Após o build, publique o conteúdo de `dist/`.
+
+## Uso
+
+1. Clique em uma célula livre para posicionar o **navio** (início).
+2. Clique em outra célula livre para posicionar o **tesouro** (destino).
+3. A busca inicia automaticamente com animação passo a passo.
+4. Use **Play/Pausa**, **+1 Passo** e o slider de velocidade para controlar a animação.
+5. Alterne entre **BFS** e **DFS** para comparar fila vs pilha.
+6. Ajuste obstáculos, embaralhe o mapa ou redimensione o grid (máx. 20×20).
+
+## Estrutura do projeto
+
+```
+src/
+├── algorithms/     # BFS, DFS e utilitários de grafo (lógica pura)
+├── components/     # UI React e cena 3D (R3F)
+├── context/        # GameContext (useReducer)
+├── hooks/          # Animação, áudio, navio
+├── styles/         # Tema pirata
+└── utils/          # Constantes e visuals
+legacy/             # Versão original HTML/CSS/JS
+public/assets/      # Áudio e imagens
+```
+
+## Outros
+
+Projeto acadêmico — FGA-UnB, Projeto de Algoritmos (Grafos 1).  
+Versão 2.0: refatoração 3D com visualização pedagógica da execução dos algoritmos.
