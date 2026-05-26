@@ -1,14 +1,6 @@
 # Caça ao Tesouro 3D
 
-**Número da Lista**: 1  
 **Conteúdo da Disciplina**: Grafos 1
-
-## Alunos
-
-| Matrícula  | Aluno                     |
-| ---------- | ------------------------- |
-| 19/0057858 | José Luís Ramos Teixeira  |
-| 19/0038900 | Victor de Souza Cabral    |
 
 ## Sobre
 
