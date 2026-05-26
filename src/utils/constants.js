@@ -10,7 +10,7 @@ export const SHIP_ROUTE_STEP_MS = 380;
 export const ELEVATION_UNIT = 0.95;
 export const PLATFORM_THICKNESS = 0.14;
 export const WATER_LEVEL = 0;
-export const TILE_RADIUS = 0.42;
+export const TILE_RADIUS = 0.48;
 
 export const DEFAULT_DIFFICULTY = 'medium';
 
