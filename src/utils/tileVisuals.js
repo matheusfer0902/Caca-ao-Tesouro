@@ -105,6 +105,44 @@ export function pointToWorld(point, grid, gridWidth, gridHeight) {
   return gridToWorld(point.i, point.j, gridWidth, gridHeight, cell.elevation ?? 0);
 }
 
+/** Posição do navio entre duas células do caminho (t 0–1). Mudança de nível em dois segmentos. */
+export function interpolateShipWorld(fromPoint, toPoint, grid, gridWidth, gridHeight, t) {
+  const fromCell = grid[fromPoint.i][fromPoint.j];
+  const toCell = grid[toPoint.i][toPoint.j];
+  const fromW = pointToWorld(fromPoint, grid, gridWidth, gridHeight);
+  const toW = pointToWorld(toPoint, grid, gridWidth, gridHeight);
+  const clamped = Math.max(0, Math.min(1, t));
+
+  const fromElev = fromCell.elevation ?? 0;
+  const toElev = toCell.elevation ?? 0;
+
+  if (fromElev === toElev) {
+    return {
+      x: fromW.x + (toW.x - fromW.x) * clamped,
+      y: fromW.y + (toW.y - fromW.y) * clamped,
+      z: fromW.z + (toW.z - fromW.z) * clamped,
+    };
+  }
+
+  const mid = { x: toW.x, y: fromW.y, z: toW.z };
+
+  if (clamped <= 0.5) {
+    const u = clamped * 2;
+    return {
+      x: fromW.x + (mid.x - fromW.x) * u,
+      y: fromW.y,
+      z: fromW.z + (mid.z - fromW.z) * u,
+    };
+  }
+
+  const u = (clamped - 0.5) * 2;
+  return {
+    x: mid.x,
+    y: fromW.y + (toW.y - fromW.y) * u,
+    z: mid.z,
+  };
+}
+
 export function getActiveDepthLevels(grid) {
   const levels = new Set();
   for (const row of grid) {

@@ -24,7 +24,7 @@ export function DepthLegend() {
     <div className="item control-panel depth-legend">
       <span className="panel-title">Camadas do mar</span>
       <p className="depth-legend-note">
-        Abismo (fundo), Mar (meio) e Recife (raso). Bolhas ligam profundidades vizinhas no grafo.
+        Abismo (fundo), Mar (meio) e Recife (raso). Bolhas são as únicas passagens entre níveis diferentes.
       </p>
       <ul className="depth-legend-list">
         {levels.map((level) => {

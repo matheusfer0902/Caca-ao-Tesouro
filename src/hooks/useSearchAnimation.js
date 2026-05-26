@@ -36,7 +36,9 @@ export function useSearchAnimation() {
 
     if (value.type === 'found' || value.type === 'no_path') {
       dispatch({ type: 'SEARCH_COMPLETE', payload: value });
-      playSound(value.type === 'found' ? 'chest' : 'chest_error');
+      if (value.type === 'found') {
+        playSound('chest');
+      }
       generatorRef.current = null;
       searchSessionRef.current = null;
       return;

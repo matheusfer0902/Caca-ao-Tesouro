@@ -2,7 +2,15 @@ import {
   cellKey,
   getNeighbors,
   buildPathFromParents,
+  validatePath,
 } from './graph.js';
+
+function visitedCoords(visited) {
+  return Array.from(visited).map((key) => {
+    const [i, j] = key.split(',').map(Number);
+    return { i, j };
+  });
+}
 
 export function* bfs(start, end, grid) {
   const visited = new Set();
@@ -39,26 +47,31 @@ export function* bfs(start, end, grid) {
         const [i, j] = key.split(',').map(Number);
         return { i, j };
       }),
-      visited: Array.from(visited).map((key) => {
-        const [i, j] = key.split(',').map(Number);
-        return { i, j };
-      }),
+      visited: visitedCoords(visited),
       nodesExplored: visited.size,
       frontierSize: frontierKeys.size,
     };
 
     if (current.i === end.i && current.j === end.j) {
-      const path = buildPathFromParents(end, parents, start);
-      yield {
-        type: 'found',
-        path,
-        visited: Array.from(visited).map((key) => {
-          const [i, j] = key.split(',').map(Number);
-          return { i, j };
-        }),
-        nodesExplored: visited.size,
-        stepsInPath: Math.max(0, path.length - 1),
-      };
+      const path = buildPathFromParents(end, parents, start, grid);
+      const check = validatePath(path, grid);
+
+      if (check.valid && path.length > 0) {
+        yield {
+          type: 'found',
+          path,
+          visited: visitedCoords(visited),
+          nodesExplored: visited.size,
+          stepsInPath: Math.max(0, path.length - 1),
+        };
+      } else {
+        yield {
+          type: 'no_path',
+          visited: visitedCoords(visited),
+          nodesExplored: visited.size,
+          noPathReason: 'exhausted',
+        };
+      }
       return;
     }
 
@@ -74,10 +87,8 @@ export function* bfs(start, end, grid) {
 
   yield {
     type: 'no_path',
-    visited: Array.from(visited).map((key) => {
-      const [i, j] = key.split(',').map(Number);
-      return { i, j };
-    }),
+    visited: visitedCoords(visited),
     nodesExplored: visited.size,
+    noPathReason: 'exhausted',
   };
 }

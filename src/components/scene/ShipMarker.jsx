@@ -6,6 +6,7 @@ import {
   pointToWorld,
   gridToWorld,
   getPlatformY,
+  interpolateShipWorld,
 } from '@/utils/tileVisuals.js';
 import {
   CELL_TYPES,
@@ -13,6 +14,7 @@ import {
   TILE_RADIUS,
   PLATFORM_THICKNESS,
 } from '@/utils/constants.js';
+import { getDepthLinks } from '@/algorithms/graph.js';
 
 function PirateShip() {
   const group = useRef();
@@ -310,60 +312,87 @@ function ShipWake({ active, headingRef }) {
 
 export function ShipMarker({ gridWidth, gridHeight }) {
   const groupRef = useRef();
-  const targetRef = useRef(new THREE.Vector3());
   const prevPosRef = useRef(new THREE.Vector3());
   const headingRef = useRef(0);
   const shipPivotRef = useRef();
+  const legProgressRef = useRef(1);
+  const prevPathIndexRef = useRef(0);
   const { state } = useGame();
   const { start, end, phase, searchSnapshot, shipPathIndex, shipAnimating, grid } = state;
   const route = searchSnapshot.path ?? [];
 
-  let targetPos = null;
-
-  if (route.length > 0 && (shipAnimating || phase === GAME_PHASES.FOUND)) {
-    const index = shipAnimating
-      ? Math.min(shipPathIndex, route.length - 1)
-      : route.length - 1;
-    targetPos = pointToWorld(route[index], grid, gridWidth, gridHeight);
-  } else if (start) {
-    const cell = grid[start.i][start.j];
-    targetPos = gridToWorld(start.i, start.j, gridWidth, gridHeight, cell.elevation ?? 0);
-  } else if (end && phase === GAME_PHASES.FOUND) {
-    const cell = grid[end.i][end.j];
-    targetPos = gridToWorld(end.i, end.j, gridWidth, gridHeight, cell.elevation ?? 0);
-  }
+  const idleAtStart = phase === GAME_PHASES.NO_PATH || phase === GAME_PHASES.IDLE || phase === GAME_PHASES.SELECTING_END;
 
   useFrame((_, delta) => {
-    if (!groupRef.current || !targetPos) return;
-    targetRef.current.set(targetPos.x, targetPos.y, targetPos.z);
-    const lerpFactor = shipAnimating ? 14 : 8;
+    if (!groupRef.current) return;
+
+    let desired = null;
+
+    if (route.length > 0 && (shipAnimating || phase === GAME_PHASES.FOUND)) {
+      const index = shipAnimating
+        ? Math.min(shipPathIndex, route.length - 1)
+        : route.length - 1;
+
+      if (index !== prevPathIndexRef.current) {
+        legProgressRef.current = 0;
+        prevPathIndexRef.current = index;
+      }
+
+      if (shipAnimating && index > 0) {
+        const from = route[index - 1];
+        const to = route[index];
+        legProgressRef.current = Math.min(1, legProgressRef.current + delta * 2.8);
+        desired = interpolateShipWorld(
+          from,
+          to,
+          grid,
+          gridWidth,
+          gridHeight,
+          legProgressRef.current
+        );
+      } else {
+        desired = pointToWorld(route[index], grid, gridWidth, gridHeight);
+      }
+    } else if (start) {
+      const cell = grid[start.i][start.j];
+      desired = gridToWorld(start.i, start.j, gridWidth, gridHeight, cell.elevation ?? 0);
+    }
+
+    if (!desired) return;
+
     const pos = groupRef.current.position;
     prevPosRef.current.copy(pos);
-    pos.lerp(targetRef.current, Math.min(delta * lerpFactor, 1));
 
-    // Update heading from movement (only when moving meaningfully)
+    const lerpFactor = shipAnimating ? 16 : idleAtStart ? 4 : 8;
+    pos.x += (desired.x - pos.x) * Math.min(delta * lerpFactor, 1);
+    pos.y += (desired.y - pos.y) * Math.min(delta * lerpFactor, 1);
+    pos.z += (desired.z - pos.z) * Math.min(delta * lerpFactor, 1);
+
     const dx = pos.x - prevPosRef.current.x;
     const dz = pos.z - prevPosRef.current.z;
     const speedSq = dx * dx + dz * dz;
     if (shipAnimating && speedSq > 1e-6) {
       const newHeading = Math.atan2(dz, dx);
-      // Smooth interpolation around -PI/PI boundary
       let diff = newHeading - headingRef.current;
       while (diff > Math.PI) diff -= 2 * Math.PI;
       while (diff < -Math.PI) diff += 2 * Math.PI;
       headingRef.current += diff * Math.min(delta * 6, 1);
     }
     if (shipPivotRef.current) {
-      // Three.js: ship's forward (+X) should align with heading direction in XZ plane.
-      // Yaw around Y by -heading (because +Z in atan2 increases counterclockwise from +X looking down -Y).
       shipPivotRef.current.rotation.y = -headingRef.current;
     }
   });
 
-  if (!targetPos) return null;
+  const initialPos = start
+    ? gridToWorld(start.i, start.j, gridWidth, gridHeight, grid[start.i][start.j].elevation ?? 0)
+    : null;
+
+  if (!initialPos && route.length === 0) return null;
+
+  const spawn = initialPos ?? pointToWorld(route[0], grid, gridWidth, gridHeight);
 
   return (
-    <group ref={groupRef} position={[targetPos.x, targetPos.y, targetPos.z]}>
+    <group ref={groupRef} position={[spawn.x, spawn.y, spawn.z]}>
       <pointLight color="#fce22a" intensity={0.4} distance={2} />
       <ShipWake active={shipAnimating} headingRef={headingRef} />
       <group ref={shipPivotRef}>
@@ -373,7 +402,7 @@ export function ShipMarker({ gridWidth, gridHeight }) {
   );
 }
 
-function TreasureChest({ color, glowing }) {
+function TreasureChest({ color, glowing, locked = false }) {
   const lidGroupRef = useRef();
   const beamRef = useRef();
   const groupRef = useRef();
@@ -385,7 +414,7 @@ function TreasureChest({ color, glowing }) {
       groupRef.current.rotation.y = Math.sin(t * 0.6) * 0.08;
     }
     if (lidGroupRef.current) {
-      const target = glowing ? -1.05 + Math.sin(t * 2.4) * 0.06 : 0;
+      const target = glowing ? -1.05 + Math.sin(t * 2.4) * 0.06 : locked ? 0.02 : 0;
       const current = lidGroupRef.current.rotation.x;
       lidGroupRef.current.rotation.x = current + (target - current) * 0.08;
     }
@@ -587,7 +616,7 @@ export function TreasureMarker({ gridWidth, gridHeight }) {
 
   return (
     <group position={[pos.x, pos.y, pos.z]}>
-      <TreasureChest color={color} glowing={phase === 'found'} />
+      <TreasureChest color={color} glowing={phase === 'found'} locked={phase === 'no_path'} />
     </group>
   );
 }
@@ -658,8 +687,6 @@ function Bubble({ position, phase }) {
 }
 
 export function CurrentStream({ fromCell, toCell, gridWidth, gridHeight }) {
-  const elevDiff = (toCell.elevation ?? 0) - (fromCell.elevation ?? 0);
-  if (elevDiff !== 1) return null;
   if (fromCell.type === CELL_TYPES.OBSTACLE || toCell.type === CELL_TYPES.OBSTACLE) return null;
 
   const from = gridToWorld(fromCell.i, fromCell.j, gridWidth, gridHeight, fromCell.elevation ?? 0);
@@ -689,25 +716,19 @@ export function CurrentStream({ fromCell, toCell, gridWidth, gridHeight }) {
 }
 
 export function CurrentStreams({ grid, gridWidth, gridHeight }) {
-  const streams = [];
+  const links = useMemo(() => getDepthLinks(grid), [grid]);
 
-  for (const row of grid) {
-    for (const cell of row) {
-      for (const neighbor of [grid[cell.i]?.[cell.j + 1], grid[cell.i + 1]?.[cell.j]].filter(Boolean)) {
-        if ((neighbor.elevation ?? 0) > (cell.elevation ?? 0)) {
-          streams.push(
-            <CurrentStream
-              key={`c-${cell.i}-${cell.j}-${neighbor.i}-${neighbor.j}`}
-              fromCell={cell}
-              toCell={neighbor}
-              gridWidth={gridWidth}
-              gridHeight={gridHeight}
-            />
-          );
-        }
-      }
-    }
-  }
-
-  return <>{streams}</>;
+  return (
+    <>
+      {links.map(({ from, to, fromCell, toCell }) => (
+        <CurrentStream
+          key={`c-${from.i}-${from.j}-${to.i}-${to.j}`}
+          fromCell={fromCell}
+          toCell={toCell}
+          gridWidth={gridWidth}
+          gridHeight={gridHeight}
+        />
+      ))}
+    </>
+  );
 }

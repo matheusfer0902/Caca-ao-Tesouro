@@ -11,6 +11,7 @@ import {
   rebuildGridWithMarkers,
   applySearchSnapshot,
   cellKey,
+  isReachable,
 } from '@/algorithms/graph.js';
 import {
   generateMapFromPreset,
@@ -52,6 +53,7 @@ export const initialState = {
   },
   shipPathIndex: 0,
   shipAnimating: false,
+  noPathReason: null,
 };
 
 function resetSelection(grid) {
@@ -121,6 +123,7 @@ export function gameReducer(state, action) {
         animation: { ...state.animation, isPlaying: false, currentStep: 0, totalSteps: 0 },
         shipPathIndex: 0,
         shipAnimating: false,
+        noPathReason: null,
       };
     }
 
@@ -140,6 +143,7 @@ export function gameReducer(state, action) {
         animation: { ...state.animation, isPlaying: false, currentStep: 0, totalSteps: 0 },
         shipPathIndex: 0,
         shipAnimating: false,
+        noPathReason: null,
       };
     }
 
@@ -150,17 +154,38 @@ export function gameReducer(state, action) {
         grid[state.start.i][state.start.j].type = CELL_TYPES.START;
       }
       grid[i][j].type = CELL_TYPES.END;
+      const end = { i, j };
+
+      if (state.start && !isReachable(state.start, end, grid)) {
+        return {
+          ...state,
+          phase: GAME_PHASES.NO_PATH,
+          end,
+          grid,
+          searchSnapshot: initialState.searchSnapshot,
+          stats: {
+            stepsInPath: 0,
+            nodesExplored: 0,
+            frontierSize: 0,
+          },
+          animation: { ...state.animation, isPlaying: false, currentStep: 0, totalSteps: 0 },
+          shipPathIndex: 0,
+          shipAnimating: false,
+          noPathReason: 'disconnected',
+        };
+      }
 
       return {
         ...state,
         phase: GAME_PHASES.SEARCHING,
-        end: { i, j },
+        end,
         grid,
         searchSnapshot: initialState.searchSnapshot,
         stats: initialState.stats,
         animation: { ...state.animation, isPlaying: true, currentStep: 0, totalSteps: 0 },
         shipPathIndex: 0,
         shipAnimating: false,
+        noPathReason: null,
       };
     }
 
@@ -211,13 +236,37 @@ export function gameReducer(state, action) {
         grid,
         searchSnapshot: { ...snapshot, path },
         stats: {
-          stepsInPath: event.stepsInPath ?? Math.max(0, path.length - 1),
+          stepsInPath: event.type === 'found' ? (event.stepsInPath ?? Math.max(0, path.length - 1)) : 0,
           nodesExplored: event.nodesExplored ?? state.stats.nodesExplored,
           frontierSize: 0,
         },
         animation: { ...state.animation, isPlaying: false },
         shipPathIndex: 0,
         shipAnimating: event.type === 'found',
+        noPathReason: event.type === 'no_path' ? (event.noPathReason ?? 'exhausted') : null,
+      };
+    }
+
+    case 'RESELECT_END': {
+      if (state.phase !== GAME_PHASES.NO_PATH && state.phase !== GAME_PHASES.FOUND) {
+        return state;
+      }
+      let grid = resetSelection(state.grid);
+      if (state.start) {
+        grid[state.start.i][state.start.j].type = CELL_TYPES.START;
+      }
+
+      return {
+        ...state,
+        phase: GAME_PHASES.SELECTING_END,
+        end: null,
+        grid,
+        searchSnapshot: initialState.searchSnapshot,
+        stats: initialState.stats,
+        animation: { ...state.animation, isPlaying: false, currentStep: 0, totalSteps: 0 },
+        shipPathIndex: 0,
+        shipAnimating: false,
+        noPathReason: null,
       };
     }
 
@@ -263,6 +312,7 @@ export function gameReducer(state, action) {
         animation: { ...state.animation, isPlaying: false, currentStep: 0, totalSteps: 0 },
         shipPathIndex: 0,
         shipAnimating: false,
+        noPathReason: null,
       };
     }
 
@@ -280,6 +330,7 @@ export function gameReducer(state, action) {
         animation: { ...state.animation, isPlaying: false, currentStep: 0, totalSteps: 0 },
         shipPathIndex: 0,
         shipAnimating: false,
+        noPathReason: null,
       };
     }
 

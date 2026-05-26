@@ -1,5 +1,12 @@
 import { CELL_TYPES } from '@/utils/constants.js';
 
+const DIRECTIONS = [
+  [-1, 0],
+  [0, 1],
+  [1, 0],
+  [0, -1],
+];
+
 export function cellKey(i, j) {
   return `${i},${j}`;
 }
@@ -33,24 +40,85 @@ export function isWalkable(i, j, grid) {
   return grid[i][j].type !== CELL_TYPES.OBSTACLE;
 }
 
+export function isTraversableCell(cell) {
+  return cell != null && cell.type !== CELL_TYPES.OBSTACLE;
+}
+
+export function areAdjacent(a, b) {
+  if (!a || !b) return false;
+  return Math.abs(a.i - b.i) + Math.abs(a.j - b.j) === 1;
+}
+
+/** Ligação de profundidade: vizinhos ortogonais walkable com |Δelevation| === 1 */
+export function hasDepthLink(fromCell, toCell) {
+  if (!fromCell || !toCell) return false;
+  if (!isTraversableCell(fromCell) || !isTraversableCell(toCell)) return false;
+  const diff = Math.abs((toCell.elevation ?? 0) - (fromCell.elevation ?? 0));
+  return diff === 1;
+}
+
+/**
+ * Mesmo nível: vizinhos ortogonais walkable.
+ * Mudança de nível: somente via hasDepthLink (corrente de bolhas).
+ */
 export function canTraverse(fromCell, toCell) {
   if (!fromCell || !toCell) return false;
-  if (toCell.type === CELL_TYPES.OBSTACLE) return false;
-  const diff = Math.abs(toCell.elevation - fromCell.elevation);
-  return diff <= 1;
+  if (!isTraversableCell(fromCell) || !isTraversableCell(toCell)) return false;
+
+  const diff = Math.abs((toCell.elevation ?? 0) - (fromCell.elevation ?? 0));
+  if (diff === 0) return true;
+  if (diff === 1) return hasDepthLink(fromCell, toCell);
+  return false;
+}
+
+function undirectedLinkKey(i1, j1, i2, j2) {
+  if (i1 < i2 || (i1 === i2 && j1 < j2)) return `${i1},${j1}|${i2},${j2}`;
+  return `${i2},${j2}|${i1},${j1}`;
+}
+
+/** Arestas de profundidade para render (CurrentStreams) e debug — uma por par de células */
+export function getDepthLinks(grid) {
+  const links = [];
+  const seen = new Set();
+  const height = grid.length;
+  const width = grid[0].length;
+
+  for (let i = 0; i < height; i++) {
+    for (let j = 0; j < width; j++) {
+      const fromCell = grid[i][j];
+      for (const [di, dj] of DIRECTIONS) {
+        const ni = i + di;
+        const nj = j + dj;
+        if (!isValidCell(ni, nj, grid)) continue;
+        const toCell = grid[ni][nj];
+        if (!hasDepthLink(fromCell, toCell)) continue;
+
+        const key = undirectedLinkKey(i, j, ni, nj);
+        if (seen.has(key)) continue;
+        seen.add(key);
+
+        const fromElev = fromCell.elevation ?? 0;
+        const toElev = toCell.elevation ?? 0;
+        const fromIsDeeper = fromElev < toElev;
+
+        links.push({
+          from: fromIsDeeper ? { i, j } : { i: ni, j: nj },
+          to: fromIsDeeper ? { i: ni, j: nj } : { i, j },
+          fromCell: fromIsDeeper ? fromCell : toCell,
+          toCell: fromIsDeeper ? toCell : fromCell,
+        });
+      }
+    }
+  }
+
+  return links;
 }
 
 export function getNeighbors(i, j, grid) {
   const current = grid[i][j];
-  const directions = [
-    [-1, 0],
-    [0, 1],
-    [1, 0],
-    [0, -1],
-  ];
-
   const neighbors = [];
-  for (const [di, dj] of directions) {
+
+  for (const [di, dj] of DIRECTIONS) {
     const ni = i + di;
     const nj = j + dj;
     if (!isValidCell(ni, nj, grid)) continue;
@@ -60,6 +128,58 @@ export function getNeighbors(i, j, grid) {
     }
   }
   return neighbors;
+}
+
+export function validatePath(path, grid) {
+  if (!path?.length) {
+    return { valid: false, reason: 'empty' };
+  }
+
+  for (let k = 0; k < path.length; k++) {
+    const p = path[k];
+    if (!isValidCell(p.i, p.j, grid) || !isWalkable(p.i, p.j, grid)) {
+      return { valid: false, invalidIndex: k, reason: 'unwalkable' };
+    }
+  }
+
+  for (let k = 0; k < path.length - 1; k++) {
+    const a = path[k];
+    const b = path[k + 1];
+    if (!areAdjacent(a, b)) {
+      return { valid: false, invalidIndex: k, reason: 'not_adjacent' };
+    }
+    const fromCell = grid[a.i][a.j];
+    const toCell = grid[b.i][b.j];
+    if (!canTraverse(fromCell, toCell)) {
+      return { valid: false, invalidIndex: k, reason: 'cannot_traverse' };
+    }
+  }
+
+  return { valid: true };
+}
+
+export function isReachable(start, end, grid) {
+  if (!start || !end || !grid?.length) return false;
+  if (start.i === end.i && start.j === end.j) return true;
+
+  const visited = new Set();
+  const queue = [{ i: start.i, j: start.j }];
+  visited.add(cellKey(start.i, start.j));
+
+  while (queue.length > 0) {
+    const cur = queue.shift();
+    if (cur.i === end.i && cur.j === end.j) return true;
+
+    for (const neighbor of getNeighbors(cur.i, cur.j, grid)) {
+      const key = cellKey(neighbor.i, neighbor.j);
+      if (!visited.has(key)) {
+        visited.add(key);
+        queue.push(neighbor);
+      }
+    }
+  }
+
+  return false;
 }
 
 export function pickObstacleVariant() {
@@ -172,23 +292,34 @@ export function coordsEqual(a, b) {
   return a.i === b.i && a.j === b.j;
 }
 
-export function buildPathFromParents(end, parents, start) {
+export function buildPathFromParents(end, parents, start, grid) {
   const path = [];
   let current = end;
+  let guard = 0;
+  const maxSteps = (grid?.length ?? 1) * (grid?.[0]?.length ?? 1) + 1;
 
-  while (current) {
+  while (current && guard++ < maxSteps) {
     path.unshift(current);
     const parent = parents.get(cellKey(current.i, current.j));
     if (!parent) break;
     current = parent;
   }
 
-  if (
-    start &&
-    path.length > 0 &&
-    (path[0].i !== start.i || path[0].j !== start.j)
-  ) {
-    path.unshift({ i: start.i, j: start.j });
+  if (start && path.length > 0 && (path[0].i !== start.i || path[0].j !== start.j)) {
+    if (
+      grid &&
+      areAdjacent(start, path[0]) &&
+      canTraverse(grid[start.i][start.j], grid[path[0].i][path[0].j])
+    ) {
+      path.unshift({ i: start.i, j: start.j });
+    } else {
+      return [];
+    }
+  }
+
+  if (grid) {
+    const check = validatePath(path, grid);
+    if (!check.valid) return [];
   }
 
   return path;

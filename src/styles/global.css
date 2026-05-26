@@ -576,6 +576,62 @@ input[type='range'] {
   line-height: 1.55;
 }
 
+.phase-guide--no-path {
+  border-color: #8b2020;
+  box-shadow:
+    inset 6px 6px rgba(0, 0, 0, 0.45),
+    0 0 0 2px rgba(220, 0, 0, 0.25);
+}
+
+.phase-guide--no-path .phase-title {
+  color: #6b1a1a;
+}
+
+.no-path-callout {
+  margin-top: 0.85rem;
+  padding: 0.75rem 0.9rem;
+  background: var(--dark-brown);
+  color: var(--yellow);
+  border-radius: 10px;
+  border: 2px solid #8b2020;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.no-path-callout-lead {
+  margin: 0 0 0.5rem;
+}
+
+.no-path-callout-detail {
+  margin: 0 0 0.5rem;
+  font-style: italic;
+}
+
+.no-path-tips {
+  margin: 0.35rem 0 0;
+  padding-left: 1.2rem;
+}
+
+.no-path-tips li {
+  margin-bottom: 0.25rem;
+}
+
+.stats-panel--no-path {
+  border: 2px solid #8b2020;
+}
+
+.stats-panel--no-path .phase-label {
+  color: #dc0000;
+  font-weight: bold;
+}
+
+.stats-no-path-note {
+  margin: 0.5rem 0 0;
+  font-size: 0.85rem;
+  color: var(--snow);
+  opacity: 0.9;
+}
+
 .simulation-layout {
   display: grid;
   grid-template-columns: 1fr min(300px, 38%);

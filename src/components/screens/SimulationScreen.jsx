@@ -1,4 +1,4 @@
-import { Suspense } from 'react';
+import { Suspense, useEffect, useRef } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { useGame } from '@/context/GameContext.jsx';
 import { Header } from '@/components/layout/Header.jsx';
@@ -7,6 +7,7 @@ import { AnimationControls } from '@/components/controls/AnimationControls.jsx';
 import { StatsPanel } from '@/components/controls/StatsPanel.jsx';
 import { DepthLegend } from '@/components/controls/DepthLegend.jsx';
 import { ErrorBoundary } from '@/components/ErrorBoundary.jsx';
+import { NoPathOutcome } from '@/components/screens/NoPathOutcome.jsx';
 import { useShipAnimation } from '@/hooks/useShipAnimation.js';
 import { GAME_PHASES } from '@/utils/constants.js';
 
@@ -71,7 +72,7 @@ function PhaseGuide() {
     },
     [GAME_PHASES.SELECTING_END]: {
       title: 'Passo 2 — Marque o tesouro',
-      text: 'Clique em outro recife. O navio só navega entre profundidades vizinhas (correntes de bolhas).',
+      text: 'Clique em outro recife. Mesmo nível: recifes vizinhos. Mudar de profundidade: só pelas correntes de bolhas.',
     },
     [GAME_PHASES.SEARCHING]: {
       title: 'Busca em andamento',
@@ -82,15 +83,17 @@ function PhaseGuide() {
       text: 'O caminho foi descoberto. Observe a rota amarela e o navio percorrendo o trajeto.',
     },
     [GAME_PHASES.NO_PATH]: {
-      title: 'Sem rota possível',
-      text: 'Não há caminho válido entre navio e tesouro com as profundidades e obstáculos atuais.',
+      title: 'Mapa encerrado — rota inexistente!',
+      text: 'Não há caminho só por recifes do mesmo nível e pelas correntes de bolhas visíveis.',
     },
   };
 
   const msg = messages[phase] || messages[GAME_PHASES.IDLE];
+  const guideClass =
+    phase === GAME_PHASES.NO_PATH ? 'phase-guide phase-guide--no-path' : 'phase-guide';
 
   return (
-    <div className="phase-guide">
+    <div className={guideClass}>
       <div className="expedition-badge">
         <span>{presetLabel}</span>
         <span>·</span>
@@ -102,6 +105,7 @@ function PhaseGuide() {
       </div>
       <h2 className="phase-title">{msg.title}</h2>
       <p className="phase-text">{msg.text}</p>
+      {phase === GAME_PHASES.NO_PATH && <NoPathOutcome />}
     </div>
   );
 }
@@ -126,6 +130,19 @@ function SimulationActions() {
         ⚓ Voltar ao porto
       </button>
 
+      {state.phase === GAME_PHASES.NO_PATH && (
+        <button
+          type="button"
+          className="custom-btn btn-search"
+          onClick={() => {
+            dispatch({ type: 'RESELECT_END' });
+            playSound('ship');
+          }}
+        >
+          🗺️ Marcar outro tesouro
+        </button>
+      )}
+
       {isFinished && (
         <button
           type="button"
@@ -144,7 +161,19 @@ function SimulationActions() {
 
 export function SimulationScreen() {
   useShipAnimation();
-  const { state, dispatch } = useGame();
+  const { state, dispatch, playSound } = useGame();
+  const prevPhaseRef = useRef(state.phase);
+
+  useEffect(() => {
+    if (
+      state.phase === GAME_PHASES.NO_PATH &&
+      prevPhaseRef.current !== GAME_PHASES.NO_PATH
+    ) {
+      playSound('chest_error');
+    }
+    prevPhaseRef.current = state.phase;
+  }, [state.phase, playSound]);
+
   const showAnimation =
     state.phase === GAME_PHASES.SEARCHING ||
     state.phase === GAME_PHASES.FOUND ||
