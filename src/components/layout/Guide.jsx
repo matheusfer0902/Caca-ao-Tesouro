@@ -4,15 +4,15 @@ export function Guide() {
       Ahoy, companheiro pirata!
       <br />
       <br />
-      Escolha um ponto de partida e destino clicando no grid 3D abaixo.
+      Configure a expedição no porto, depois zarpamos para o oceano 3D.
       <br />
       <br />
-      O <strong>BFS</strong> encontra o caminho com menor número de passos.
+      Cada <strong>profundidade</strong> é um recife: do Abismo (escuro) à Superfície (claro). Correntes de
+      bolhas ligam camadas vizinhas.
       <br />
-      O <strong>DFS</strong> encontra um caminho válido, mas não necessariamente o mais curto.
       <br />
-      <br />
-      Observe a animação passo a passo: fila (BFS) vs pilha (DFS).
+      O <strong>BFS</strong> encontra o caminho com menos passos. O <strong>DFS</strong> encontra um caminho
+      válido, mas não necessariamente o mais curto.
     </label>
   );
 }

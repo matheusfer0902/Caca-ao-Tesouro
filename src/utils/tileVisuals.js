@@ -1,56 +1,116 @@
-import { useMemo } from 'react';
-import * as THREE from 'three';
-import { COLORS, CELL_TYPES, SEARCH_STATUS } from '@/utils/constants.js';
+import {
+  COLORS,
+  CELL_TYPES,
+  SEARCH_STATUS,
+  DEPTH_ZONES,
+  ELEVATION_UNIT,
+  PLATFORM_THICKNESS,
+  WATER_LEVEL,
+} from '@/utils/constants.js';
 
-export function getTileVisual(cell) {
-  const base = {
-    color: COLORS.tile,
-    height: 0.25,
-    emissive: '#000000',
-    emissiveIntensity: 0,
-    opacity: 1,
-  };
+export function getDepthZone(elevation = 0) {
+  return DEPTH_ZONES[Math.min(elevation, DEPTH_ZONES.length - 1)] || DEPTH_ZONES[0];
+}
+
+export function getWorldY(elevation = 0) {
+  return WATER_LEVEL + elevation * ELEVATION_UNIT + PLATFORM_THICKNESS / 2;
+}
+
+export function getPlatformY(elevation = 0) {
+  return WATER_LEVEL + elevation * ELEVATION_UNIT;
+}
+
+export function getTerrainCenterY(maxElevation) {
+  return getWorldY(maxElevation / 2);
+}
+
+export function getTileAppearance(cell) {
+  const zone = getDepthZone(cell.elevation ?? 0);
+  let platform = zone.platform;
+  let glow = zone.glow;
+  let emissiveIntensity = 0.08;
+  let opacity = 1;
 
   if (cell.type === CELL_TYPES.OBSTACLE) {
-    return { ...base, color: COLORS.obstacle, height: 0.55 };
+    return { platform: COLORS.obstacle, glow: '#906821', emissiveIntensity: 0.1, opacity: 1, zone };
   }
 
   if (cell.searchStatus === SEARCH_STATUS.PATH || cell.searchStatus === 'path') {
-    return { ...base, color: COLORS.tilePath, height: 0.35, emissive: COLORS.tilePath, emissiveIntensity: 0.15 };
+    return {
+      platform: COLORS.tilePath,
+      glow: '#fce22a',
+      emissiveIntensity: 0.35,
+      opacity: 1,
+      zone,
+    };
   }
 
   if (cell.searchStatus === SEARCH_STATUS.CURRENT || cell.searchStatus === 'current') {
-    return { ...base, color: COLORS.tileCurrent, height: 0.4, emissive: COLORS.tileCurrent, emissiveIntensity: 0.35 };
+    return {
+      platform: COLORS.tileCurrent,
+      glow: '#fce22a',
+      emissiveIntensity: 0.5,
+      opacity: 1,
+      zone,
+    };
   }
 
   if (cell.searchStatus === SEARCH_STATUS.FRONTIER || cell.searchStatus === 'frontier') {
-    return { ...base, color: COLORS.tileFrontier, height: 0.3, emissive: COLORS.tileFrontier, emissiveIntensity: 0.25 };
+    return {
+      platform: COLORS.tileFrontier,
+      glow: '#00ffca',
+      emissiveIntensity: 0.4,
+      opacity: 1,
+      zone,
+    };
   }
 
   if (cell.searchStatus === SEARCH_STATUS.VISITED || cell.searchStatus === 'visited') {
-    return { ...base, color: COLORS.tileVisited, height: 0.25, opacity: 0.85 };
+    return {
+      platform: COLORS.tileVisited,
+      glow: zone.glow,
+      emissiveIntensity: 0.05,
+      opacity: 0.7,
+      zone,
+    };
   }
 
   if (cell.type === CELL_TYPES.START || cell.type === CELL_TYPES.END) {
-    return { ...base, color: COLORS.start, height: 0.3 };
+    return {
+      platform: COLORS.start,
+      glow: '#22c55e',
+      emissiveIntensity: 0.25,
+      opacity: 1,
+      zone,
+    };
   }
 
-  return base;
+  return { platform, glow, emissiveIntensity, opacity, zone };
 }
 
-export function gridToWorld(i, j, gridWidth, gridHeight) {
+export function gridToWorld(i, j, gridWidth, gridHeight, elevation = 0) {
   return {
     x: j - gridWidth / 2 + 0.5,
+    y: getWorldY(elevation),
     z: i - gridHeight / 2 + 0.5,
   };
 }
 
-export function useTileColor(cell) {
-  return useMemo(() => getTileVisual(cell), [cell]);
+export function cellToWorld(cell, gridWidth, gridHeight) {
+  return gridToWorld(cell.i, cell.j, gridWidth, gridHeight, cell.elevation ?? 0);
 }
 
-export function lerpColor(from, to, t) {
-  const c1 = new THREE.Color(from);
-  const c2 = new THREE.Color(to);
-  return c1.lerp(c2, t).getStyle();
+export function pointToWorld(point, grid, gridWidth, gridHeight) {
+  const cell = grid[point.i][point.j];
+  return gridToWorld(point.i, point.j, gridWidth, gridHeight, cell.elevation ?? 0);
+}
+
+export function getActiveDepthLevels(grid) {
+  const levels = new Set();
+  for (const row of grid) {
+    for (const cell of row) {
+      levels.add(cell.elevation ?? 0);
+    }
+  }
+  return Array.from(levels).sort((a, b) => a - b);
 }

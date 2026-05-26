@@ -1,69 +1,78 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useMemo } from 'react';
 import { OrbitControls } from '@react-three/drei';
 import { Tile } from './Tile.jsx';
-import { ShipMarker, TreasureMarker, ObstacleDecor } from './ShipMarker.jsx';
+import {
+  ShipMarker,
+  TreasureMarker,
+  ObstacleDecor,
+  CurrentStreams,
+} from './ShipMarker.jsx';
+import { DepthStrata } from './DepthStrata.jsx';
+import { OceanFloor } from './OceanEnvironment.jsx';
 import { SceneLighting } from './SceneLighting.jsx';
 import { useGame } from '@/context/GameContext.jsx';
+import { getTerrainCenterY } from '@/utils/tileVisuals.js';
 
-function WaterPlane({ gridWidth, gridHeight }) {
-  const size = Math.max(gridWidth, gridHeight) + 8;
-  return (
-    <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.05, 0]}>
-      <planeGeometry args={[size, size]} />
-      <meshStandardMaterial color="#06283d" transparent opacity={0.85} roughness={0.2} metalness={0.4} />
-    </mesh>
-  );
-}
-
-function CameraControls({ distance }) {
+function CameraControls({ targetY }) {
   const controlsRef = useRef();
 
   useEffect(() => {
     const handler = () => {
       if (controlsRef.current) {
-        controlsRef.current.reset();
+        controlsRef.current.target.set(0, targetY, 0);
+        controlsRef.current.update();
       }
     };
     window.addEventListener('reset-camera', handler);
     return () => window.removeEventListener('reset-camera', handler);
-  }, []);
+  }, [targetY]);
 
   return (
     <OrbitControls
       ref={controlsRef}
       enablePan
-      minDistance={6}
-      maxDistance={35}
-      maxPolarAngle={Math.PI / 2.2}
-      minPolarAngle={Math.PI / 6}
-      target={[0, 0, 0]}
+      minDistance={8}
+      maxDistance={50}
+      maxPolarAngle={Math.PI / 2.05}
+      minPolarAngle={Math.PI / 12}
+      target={[0, targetY, 0]}
     />
   );
 }
 
 export function GridScene() {
   const { state } = useGame();
-  const { grid, gridSize } = state;
+  const { grid, gridSize, maxElevation } = state;
   const gridWidth = gridSize.x;
   const gridHeight = gridSize.y;
+  const targetY = getTerrainCenterY(maxElevation);
 
-  return (
-    <>
-      <SceneLighting />
-      <color attach="background" args={['#041f30']} />
-
-      <CameraControls distance={Math.max(gridWidth, gridHeight)} />
-
-      <WaterPlane gridWidth={gridWidth} gridHeight={gridHeight} />
-
-      {grid.map((row) =>
+  const tiles = useMemo(
+    () =>
+      grid.flatMap((row) =>
         row.map((cell) => (
           <group key={`${cell.i}-${cell.j}`}>
             <Tile cell={cell} gridWidth={gridWidth} gridHeight={gridHeight} />
             <ObstacleDecor cell={cell} gridWidth={gridWidth} gridHeight={gridHeight} />
           </group>
         ))
-      )}
+      ),
+    [grid, gridWidth, gridHeight]
+  );
+
+  return (
+    <>
+      <SceneLighting targetY={targetY} />
+      <color attach="background" args={['#06283d']} />
+
+      <CameraControls targetY={0.5 + (maxElevation ?? 0) * 0.45} />
+
+      <OceanFloor gridWidth={gridWidth} gridHeight={gridHeight} />
+      <DepthStrata gridWidth={gridWidth} gridHeight={gridHeight} />
+
+      {tiles}
+
+      <CurrentStreams grid={grid} gridWidth={gridWidth} gridHeight={gridHeight} />
 
       <ShipMarker gridWidth={gridWidth} gridHeight={gridHeight} />
       <TreasureMarker gridWidth={gridWidth} gridHeight={gridHeight} />

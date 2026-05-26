@@ -1,6 +1,6 @@
 import { useSearchAnimation } from '@/hooks/useSearchAnimation.js';
 import { useGame } from '@/context/GameContext.jsx';
-import { MIN_ANIMATION_SPEED, MAX_ANIMATION_SPEED } from '@/utils/constants.js';
+import { MIN_ANIMATION_SPEED, MAX_ANIMATION_SPEED, GAME_PHASES } from '@/utils/constants.js';
 
 export function AnimationControls() {
   const { state, dispatch } = useGame();
@@ -10,21 +10,23 @@ export function AnimationControls() {
     window.dispatchEvent(new CustomEvent('reset-camera'));
   };
 
+  const locked = state.phase === GAME_PHASES.FOUND || state.phase === GAME_PHASES.NO_PATH;
+
   return (
     <div className="item control-panel animation-controls">
-      <span className="panel-title">Animação da busca</span>
+      <span className="panel-title">Controle da busca</span>
       <div className="anim-buttons">
         <button
           className="custom-btn btn-search"
           onClick={togglePlay}
-          disabled={!isSearching}
+          disabled={!isSearching || locked}
         >
           {state.animation.isPlaying ? 'Pausar' : 'Play'}
         </button>
         <button
           className="custom-btn btn-search"
           onClick={stepForward}
-          disabled={!isSearching}
+          disabled={!isSearching || locked}
         >
           +1 Passo
         </button>
@@ -32,9 +34,7 @@ export function AnimationControls() {
       <button className="custom-btn btn-search" onClick={resetCamera}>
         Reset Câmera
       </button>
-      <label htmlFor="speed-slider">
-        Velocidade: {state.animation.speed}ms/passo
-      </label>
+      <label htmlFor="speed-slider">Velocidade: {state.animation.speed}ms/passo</label>
       <input
         id="speed-slider"
         type="range"
@@ -42,6 +42,7 @@ export function AnimationControls() {
         max={MAX_ANIMATION_SPEED}
         step={50}
         value={state.animation.speed}
+        disabled={locked}
         onChange={(e) => dispatch({ type: 'SET_SPEED', payload: Number(e.target.value) })}
       />
       <div className="progress-bar">

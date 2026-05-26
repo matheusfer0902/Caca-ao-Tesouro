@@ -9,8 +9,8 @@ export function parseKey(key) {
   return { i, j };
 }
 
-export function createCell(i, j, type = CELL_TYPES.EMPTY, obstacleVariant = 1) {
-  return { i, j, type, obstacleVariant, searchStatus: null, depth: null };
+export function createCell(i, j, type = CELL_TYPES.EMPTY, obstacleVariant = 1, elevation = 0) {
+  return { i, j, type, obstacleVariant, elevation, searchStatus: null, depth: null };
 }
 
 export function createGrid(width, height) {
@@ -33,7 +33,15 @@ export function isWalkable(i, j, grid) {
   return grid[i][j].type !== CELL_TYPES.OBSTACLE;
 }
 
+export function canTraverse(fromCell, toCell) {
+  if (!fromCell || !toCell) return false;
+  if (toCell.type === CELL_TYPES.OBSTACLE) return false;
+  const diff = Math.abs(toCell.elevation - fromCell.elevation);
+  return diff <= 1;
+}
+
 export function getNeighbors(i, j, grid) {
+  const current = grid[i][j];
   const directions = [
     [-1, 0],
     [0, 1],
@@ -45,7 +53,9 @@ export function getNeighbors(i, j, grid) {
   for (const [di, dj] of directions) {
     const ni = i + di;
     const nj = j + dj;
-    if (isWalkable(ni, nj, grid)) {
+    if (!isValidCell(ni, nj, grid)) continue;
+    const target = grid[ni][nj];
+    if (canTraverse(current, target)) {
       neighbors.push({ i: ni, j: nj });
     }
   }
@@ -162,7 +172,7 @@ export function coordsEqual(a, b) {
   return a.i === b.i && a.j === b.j;
 }
 
-export function buildPathFromParents(end, parents) {
+export function buildPathFromParents(end, parents, start) {
   const path = [];
   let current = end;
 
@@ -173,5 +183,23 @@ export function buildPathFromParents(end, parents) {
     current = parent;
   }
 
+  if (
+    start &&
+    path.length > 0 &&
+    (path[0].i !== start.i || path[0].j !== start.j)
+  ) {
+    path.unshift({ i: start.i, j: start.j });
+  }
+
   return path;
+}
+
+export function getMaxElevation(grid) {
+  let max = 0;
+  for (const row of grid) {
+    for (const cell of row) {
+      max = Math.max(max, cell.elevation ?? 0);
+    }
+  }
+  return max;
 }

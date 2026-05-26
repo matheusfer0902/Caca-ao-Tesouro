@@ -1,25 +1,34 @@
 import {
   DEFAULT_ANIMATION_SPEED,
-  DEFAULT_GRID_SIZE,
-  DEFAULT_OBSTACLES,
+  DEFAULT_DIFFICULTY,
   GAME_PHASES,
+  APP_SCREENS,
   CELL_TYPES,
 } from '@/utils/constants.js';
 import {
-  createGrid,
-  placeObstacles,
   clearSearchState,
   cloneGrid,
   rebuildGridWithMarkers,
   applySearchSnapshot,
   cellKey,
 } from '@/algorithms/graph.js';
+import {
+  generateMapFromPreset,
+  generateCustomMap,
+  shuffleMap,
+} from '@/utils/terrainGenerator.js';
+
+const initialMap = generateMapFromPreset(DEFAULT_DIFFICULTY);
 
 export const initialState = {
+  appScreen: APP_SCREENS.SETUP,
   phase: GAME_PHASES.IDLE,
-  grid: placeObstacles(createGrid(DEFAULT_GRID_SIZE, DEFAULT_GRID_SIZE), DEFAULT_OBSTACLES),
-  gridSize: { x: DEFAULT_GRID_SIZE, y: DEFAULT_GRID_SIZE },
-  numObstacles: DEFAULT_OBSTACLES,
+  grid: initialMap.grid,
+  gridSize: initialMap.gridSize,
+  numObstacles: initialMap.numObstacles,
+  mapDifficulty: initialMap.mapDifficulty,
+  maxElevation: initialMap.maxElevation,
+  presetLabel: initialMap.presetLabel,
   algorithm: 'bfs',
   start: null,
   end: null,
@@ -58,6 +67,39 @@ function snapshotFromEvent(event) {
     visited: (event.visited || []).map((p) => cellKey(p.i, p.j)),
     path: event.path || [],
     depth: event.depth ?? null,
+  };
+}
+
+function resetGameFields(state, mapData) {
+  return {
+    ...initialState,
+    appScreen: state.appScreen,
+    grid: mapData.grid,
+    gridSize: mapData.gridSize,
+    numObstacles: mapData.numObstacles,
+    mapDifficulty: mapData.mapDifficulty,
+    maxElevation: mapData.maxElevation,
+    presetLabel: mapData.presetLabel,
+    algorithm: state.algorithm,
+    animation: { ...initialState.animation, speed: state.animation.speed },
+  };
+}
+
+function buildExpeditionState(state, mapData, algorithm, speed) {
+  return {
+    ...initialState,
+    appScreen: APP_SCREENS.SIMULATION,
+    grid: mapData.grid,
+    gridSize: mapData.gridSize,
+    numObstacles: mapData.numObstacles,
+    mapDifficulty: mapData.mapDifficulty,
+    maxElevation: mapData.maxElevation,
+    presetLabel: mapData.presetLabel,
+    algorithm,
+    animation: {
+      ...initialState.animation,
+      speed: speed ?? state.animation?.speed ?? DEFAULT_ANIMATION_SPEED,
+    },
   };
 }
 
@@ -127,10 +169,7 @@ export function gameReducer(state, action) {
       const snapshot = snapshotFromEvent(event);
       const grid = applySearchSnapshot(
         rebuildGridWithMarkers(state.grid, state.start, state.end),
-        {
-          ...snapshot,
-          path: [],
-        }
+        { ...snapshot, path: [] }
       );
 
       return {
@@ -155,10 +194,7 @@ export function gameReducer(state, action) {
       const snapshot = snapshotFromEvent(event);
       const grid = applySearchSnapshot(
         rebuildGridWithMarkers(state.grid, state.start, state.end),
-        {
-          ...snapshot,
-          path,
-        }
+        { ...snapshot, path }
       );
 
       if (event.type === 'found') {
@@ -179,16 +215,60 @@ export function gameReducer(state, action) {
           nodesExplored: event.nodesExplored ?? state.stats.nodesExplored,
           frontierSize: 0,
         },
-        animation: {
-          ...state.animation,
-          isPlaying: false,
-        },
+        animation: { ...state.animation, isPlaying: false },
         shipPathIndex: 0,
         shipAnimating: event.type === 'found',
       };
     }
 
-    case 'RESET_SELECTION': {
+    case 'RESET_SELECTION':
+      return {
+        ...state,
+        phase: GAME_PHASES.IDLE,
+        start: null,
+        end: null,
+        grid: resetSelection(state.grid),
+        searchSnapshot: initialState.searchSnapshot,
+        stats: initialState.stats,
+        animation: { ...state.animation, isPlaying: false, currentStep: 0, totalSteps: 0 },
+        shipPathIndex: 0,
+        shipAnimating: false,
+      };
+
+    case 'START_EXPEDITION': {
+      const { algorithm, difficulty, custom, x, y, obstacles, maxElevation, speed } =
+        action.payload;
+      let mapData;
+
+      if (custom) {
+        mapData = generateCustomMap(x, y, obstacles, maxElevation ?? 2);
+      } else {
+        mapData = generateMapFromPreset(difficulty);
+      }
+
+      return buildExpeditionState(state, mapData, algorithm, speed);
+    }
+
+    case 'GO_TO_SETUP': {
+      if (state.phase === GAME_PHASES.SEARCHING) return state;
+
+      return {
+        ...state,
+        appScreen: APP_SCREENS.SETUP,
+        phase: GAME_PHASES.IDLE,
+        start: null,
+        end: null,
+        searchSnapshot: initialState.searchSnapshot,
+        stats: initialState.stats,
+        animation: { ...state.animation, isPlaying: false, currentStep: 0, totalSteps: 0 },
+        shipPathIndex: 0,
+        shipAnimating: false,
+      };
+    }
+
+    case 'NEW_EXPEDITION': {
+      if (state.phase === GAME_PHASES.SEARCHING) return state;
+
       return {
         ...state,
         phase: GAME_PHASES.IDLE,
@@ -203,70 +283,75 @@ export function gameReducer(state, action) {
       };
     }
 
+    case 'SET_DIFFICULTY': {
+      const mapData = generateMapFromPreset(action.payload);
+      return resetGameFields(state, mapData);
+    }
+
     case 'SHUFFLE': {
-      let grid = createGrid(state.gridSize.x, state.gridSize.y);
-      grid = placeObstacles(grid, state.numObstacles);
-      return {
-        ...initialState,
+      const grid = shuffleMap(
+        state.grid,
+        state.numObstacles,
+        state.maxElevation,
+        state.mapDifficulty === 'custom' ? 'medium' : state.mapDifficulty
+      );
+      return resetGameFields(state, {
         grid,
         gridSize: state.gridSize,
         numObstacles: state.numObstacles,
-        algorithm: state.algorithm,
-        animation: { ...initialState.animation, speed: state.animation.speed },
-      };
+        mapDifficulty: state.mapDifficulty,
+        maxElevation: state.maxElevation,
+        presetLabel: state.presetLabel,
+      });
     }
 
     case 'RESIZE_GRID': {
       const { x, y } = action.payload;
-      let grid = createGrid(x, y);
-      grid = placeObstacles(grid, state.numObstacles);
-      return {
-        ...initialState,
-        grid,
-        gridSize: { x, y },
-        numObstacles: state.numObstacles,
-        algorithm: state.algorithm,
-        animation: { ...initialState.animation, speed: state.animation.speed },
-      };
+      const mapData = generateCustomMap(x, y, state.numObstacles, state.maxElevation);
+      return resetGameFields(state, mapData);
     }
 
     case 'SET_OBSTACLES': {
       const count = action.payload;
-      let grid = createGrid(state.gridSize.x, state.gridSize.y);
-      grid = placeObstacles(grid, count);
-      return {
-        ...initialState,
-        grid,
-        gridSize: state.gridSize,
-        numObstacles: count,
-        algorithm: state.algorithm,
-        animation: { ...initialState.animation, speed: state.animation.speed },
-      };
+      const mapData = generateCustomMap(
+        state.gridSize.x,
+        state.gridSize.y,
+        count,
+        state.maxElevation
+      );
+      return resetGameFields(state, { ...mapData, numObstacles: count });
     }
 
     case 'SET_ALGORITHM':
       return { ...state, algorithm: action.payload };
 
     case 'PLAY':
-      return {
-        ...state,
-        animation: { ...state.animation, isPlaying: true },
-      };
+      return { ...state, animation: { ...state.animation, isPlaying: true } };
 
     case 'PAUSE':
-      return {
-        ...state,
-        animation: { ...state.animation, isPlaying: false },
-      };
+      return { ...state, animation: { ...state.animation, isPlaying: false } };
 
     case 'SET_SPEED':
-      return {
-        ...state,
-        animation: { ...state.animation, speed: action.payload },
-      };
+      return { ...state, animation: { ...state.animation, speed: action.payload } };
+
+    case 'START_SHIP_ROUTE': {
+      if (state.phase !== GAME_PHASES.FOUND) return state;
+      const path = state.searchSnapshot.path || [];
+      if (path.length < 2) {
+        return {
+          ...state,
+          shipAnimating: false,
+          shipPathIndex: Math.max(0, path.length - 1),
+        };
+      }
+      return { ...state, shipAnimating: true, shipPathIndex: 0 };
+    }
 
     case 'ADVANCE_SHIP': {
       const path = state.searchSnapshot.path || [];
+      if (path.length < 2) {
+        return { ...state, shipAnimating: false, shipPathIndex: Math.max(0, path.length - 1) };
+      }
       const nextIndex = state.shipPathIndex + 1;
       if (nextIndex >= path.length) {
         return { ...state, shipAnimating: false, shipPathIndex: path.length - 1 };

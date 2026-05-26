@@ -48,7 +48,7 @@ export function* bfs(start, end, grid) {
     };
 
     if (current.i === end.i && current.j === end.j) {
-      const path = buildPathFromParents(end, parents);
+      const path = buildPathFromParents(end, parents, start);
       yield {
         type: 'found',
         path,

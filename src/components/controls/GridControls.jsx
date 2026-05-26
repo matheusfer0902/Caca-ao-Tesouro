@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useGame } from '@/context/GameContext.jsx';
 import { MAX_GRID } from '@/utils/constants.js';
 
@@ -7,6 +7,12 @@ export function GridControls() {
   const [obstacles, setObstacles] = useState(state.numObstacles);
   const [sizeX, setSizeX] = useState(state.gridSize.x);
   const [sizeY, setSizeY] = useState(state.gridSize.y);
+
+  useEffect(() => {
+    setObstacles(state.numObstacles);
+    setSizeX(state.gridSize.x);
+    setSizeY(state.gridSize.y);
+  }, [state.numObstacles, state.gridSize.x, state.gridSize.y, state.mapDifficulty]);
 
   const maxObstacles = state.gridSize.x * state.gridSize.y;
 
