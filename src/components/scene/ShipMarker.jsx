@@ -1,7 +1,7 @@
 import { useRef, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
-import { useGame } from '@/context/GameContext.jsx';
+import { useSimulationSlice } from '@/context/SimulationSliceContext.jsx';
 import {
   pointToWorld,
   gridToWorld,
@@ -317,8 +317,8 @@ export function ShipMarker({ gridWidth, gridHeight }) {
   const shipPivotRef = useRef();
   const legProgressRef = useRef(1);
   const prevPathIndexRef = useRef(0);
-  const { state } = useGame();
-  const { start, end, phase, searchSnapshot, shipPathIndex, shipAnimating, grid } = state;
+  const slice = useSimulationSlice();
+  const { start, end, phase, searchSnapshot, shipPathIndex, shipAnimating, grid } = slice;
   const route = searchSnapshot.path ?? [];
 
   const idleAtStart = phase === GAME_PHASES.NO_PATH || phase === GAME_PHASES.IDLE || phase === GAME_PHASES.SELECTING_END;
@@ -605,8 +605,8 @@ function TreasureChest({ color, glowing, locked = false }) {
 }
 
 export function TreasureMarker({ gridWidth, gridHeight }) {
-  const { state } = useGame();
-  const { end, phase, grid } = state;
+  const slice = useSimulationSlice();
+  const { end, phase, grid } = slice;
 
   if (!end || phase === 'idle' || phase === 'selecting_end') return null;
 

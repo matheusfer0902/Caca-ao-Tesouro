@@ -11,6 +11,7 @@ import { DepthStrata } from './DepthStrata.jsx';
 import { OceanFloor } from './OceanEnvironment.jsx';
 import { SceneLighting } from './SceneLighting.jsx';
 import { useGame } from '@/context/GameContext.jsx';
+import { useSimulationSlice } from '@/context/SimulationSliceContext.jsx';
 import { getTerrainCenterY } from '@/utils/tileVisuals.js';
 
 function CameraControls({ targetY }) {
@@ -42,7 +43,9 @@ function CameraControls({ targetY }) {
 
 export function GridScene() {
   const { state } = useGame();
-  const { grid, gridSize, maxElevation } = state;
+  const slice = useSimulationSlice();
+  const { gridSize, maxElevation } = state;
+  const grid = slice.grid;
   const gridWidth = gridSize.x;
   const gridHeight = gridSize.y;
   const targetY = getTerrainCenterY(maxElevation);

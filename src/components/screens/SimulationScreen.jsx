@@ -6,8 +6,17 @@ import { GridScene } from '@/components/scene/GridScene.jsx';
 import { AnimationControls } from '@/components/controls/AnimationControls.jsx';
 import { StatsPanel } from '@/components/controls/StatsPanel.jsx';
 import { DepthLegend } from '@/components/controls/DepthLegend.jsx';
+import { ComparisonSummary } from '@/components/controls/ComparisonSummary.jsx';
+import { ComparisonLayout } from '@/components/screens/ComparisonLayout.jsx';
+import { useComparisonWallClock } from '@/hooks/useComparisonWallClock.js';
 import { ErrorBoundary } from '@/components/ErrorBoundary.jsx';
 import { NoPathOutcome } from '@/components/screens/NoPathOutcome.jsx';
+import { SimulationSliceProvider } from '@/context/SimulationSliceContext.jsx';
+import {
+  isCompareFinished,
+  isCompareMode,
+  isCompareSearching,
+} from '@/context/SimulationSliceContext.jsx';
 import { useShipAnimation } from '@/hooks/useShipAnimation.js';
 import { GAME_PHASES } from '@/utils/constants.js';
 
@@ -38,24 +47,26 @@ function SceneViewport() {
           </div>
         }
       >
-        <Canvas
-          key={`ocean-${state.gridSize.x}-${state.gridSize.y}-${state.mapDifficulty}`}
-          camera={{
-            position: [camDist * 0.75, camDist * 0.85, camDist * 0.75],
-            fov: 50,
-            near: 0.1,
-            far: 200,
-          }}
-          onCreated={({ camera }) => {
-            camera.lookAt(0, targetY, 0);
-          }}
-          gl={{ antialias: true, alpha: false, powerPreference: 'high-performance' }}
-          dpr={[1, 2]}
-        >
-          <Suspense fallback={<SceneLoading />}>
-            <GridScene />
-          </Suspense>
-        </Canvas>
+        <SimulationSliceProvider>
+          <Canvas
+            key={`ocean-${state.gridSize.x}-${state.gridSize.y}-${state.mapDifficulty}`}
+            camera={{
+              position: [camDist * 0.75, camDist * 0.85, camDist * 0.75],
+              fov: 50,
+              near: 0.1,
+              far: 200,
+            }}
+            onCreated={({ camera }) => {
+              camera.lookAt(0, targetY, 0);
+            }}
+            gl={{ antialias: true, alpha: false, powerPreference: 'high-performance' }}
+            dpr={[1, 2]}
+          >
+            <Suspense fallback={<SceneLoading />}>
+              <GridScene />
+            </Suspense>
+          </Canvas>
+        </SimulationSliceProvider>
       </ErrorBoundary>
     </div>
   );
@@ -64,29 +75,53 @@ function SceneViewport() {
 function PhaseGuide() {
   const { state } = useGame();
   const { phase, algorithm, presetLabel } = state;
+  const compare = isCompareMode(state);
 
-  const messages = {
-    [GAME_PHASES.IDLE]: {
-      title: 'Passo 1 — Ancore o navio',
-      text: 'Clique em um recife livre. Águas mais claras = mais rasas; mais escuras = abismo.',
-    },
-    [GAME_PHASES.SELECTING_END]: {
-      title: 'Passo 2 — Marque o tesouro',
-      text: 'Clique em outro recife. Mesmo nível: recifes vizinhos. Mudar de profundidade: só pelas correntes de bolhas.',
-    },
-    [GAME_PHASES.SEARCHING]: {
-      title: 'Busca em andamento',
-      text: `O ${algorithm.toUpperCase()} está explorando o mapa. Use os controles abaixo para pausar ou avançar passo a passo.`,
-    },
-    [GAME_PHASES.FOUND]: {
-      title: 'Tesouro encontrado!',
-      text: 'O caminho foi descoberto. Observe a rota amarela e o navio percorrendo o trajeto.',
-    },
-    [GAME_PHASES.NO_PATH]: {
-      title: 'Mapa encerrado — rota inexistente!',
-      text: 'Não há caminho só por recifes do mesmo nível e pelas correntes de bolhas visíveis.',
-    },
-  };
+  const messages = compare
+    ? {
+        [GAME_PHASES.IDLE]: {
+          title: 'Passo 1 — Ancore o navio',
+          text: 'Clique em um recife livre nos dois mapas. A posição vale para BFS e DFS ao mesmo tempo.',
+        },
+        [GAME_PHASES.SELECTING_END]: {
+          title: 'Passo 2 — Marque o tesouro',
+          text: 'Clique em outro recife. As duas buscas (BFS e DFS) iniciarão juntas com cronômetros individuais.',
+        },
+        [GAME_PHASES.SEARCHING]: {
+          title: 'Comparação em andamento',
+          text: 'BFS e DFS exploram o mesmo mapa simultaneamente. Observe fila vs pilha, tempo e estatísticas.',
+        },
+        [GAME_PHASES.FOUND]: {
+          title: 'Comparação concluída',
+          text: 'Pelo menos um algoritmo encontrou o tesouro. Compare tempo, nós explorados e caminho.',
+        },
+        [GAME_PHASES.NO_PATH]: {
+          title: 'Comparação concluída — sem rota',
+          text: 'Nenhum algoritmo encontrou caminho válido neste mapa.',
+        },
+      }
+    : {
+        [GAME_PHASES.IDLE]: {
+          title: 'Passo 1 — Ancore o navio',
+          text: 'Clique em um recife livre. Águas mais claras = mais rasas; mais escuras = abismo.',
+        },
+        [GAME_PHASES.SELECTING_END]: {
+          title: 'Passo 2 — Marque o tesouro',
+          text: 'Clique em outro recife. Mesmo nível: recifes vizinhos. Mudar de profundidade: só pelas correntes de bolhas.',
+        },
+        [GAME_PHASES.SEARCHING]: {
+          title: 'Busca em andamento',
+          text: `O ${algorithm.toUpperCase()} está explorando o mapa. Use os controles abaixo para pausar ou avançar passo a passo.`,
+        },
+        [GAME_PHASES.FOUND]: {
+          title: 'Tesouro encontrado!',
+          text: 'O caminho foi descoberto. Observe a rota amarela e o navio percorrendo o trajeto.',
+        },
+        [GAME_PHASES.NO_PATH]: {
+          title: 'Mapa encerrado — rota inexistente!',
+          text: 'Não há caminho só por recifes do mesmo nível e pelas correntes de bolhas visíveis.',
+        },
+      };
 
   const msg = messages[phase] || messages[GAME_PHASES.IDLE];
   const guideClass =
@@ -97,7 +132,7 @@ function PhaseGuide() {
       <div className="expedition-badge">
         <span>{presetLabel}</span>
         <span>·</span>
-        <span>{algorithm.toUpperCase()}</span>
+        <span>{compare ? 'BFS vs DFS' : algorithm.toUpperCase()}</span>
         <span>·</span>
         <span>
           {state.gridSize.x}×{state.gridSize.y}
@@ -105,16 +140,18 @@ function PhaseGuide() {
       </div>
       <h2 className="phase-title">{msg.title}</h2>
       <p className="phase-text">{msg.text}</p>
-      {phase === GAME_PHASES.NO_PATH && <NoPathOutcome />}
+      {phase === GAME_PHASES.NO_PATH && !compare && <NoPathOutcome />}
     </div>
   );
 }
 
 function SimulationActions() {
   const { state, dispatch, playSound } = useGame();
-  const isSearching = state.phase === GAME_PHASES.SEARCHING;
-  const isFinished =
-    state.phase === GAME_PHASES.FOUND || state.phase === GAME_PHASES.NO_PATH;
+  const compare = isCompareMode(state);
+  const isSearching = compare ? isCompareSearching(state) : state.phase === GAME_PHASES.SEARCHING;
+  const isFinished = compare
+    ? isCompareFinished(state)
+    : state.phase === GAME_PHASES.FOUND || state.phase === GAME_PHASES.NO_PATH;
 
   return (
     <div className="simulation-actions">
@@ -159,10 +196,37 @@ function SimulationActions() {
   );
 }
 
+function CompareSimulationContent() {
+  useComparisonWallClock();
+  const { state } = useGame();
+
+  const showAnimation =
+    state.phase !== GAME_PHASES.IDLE && state.phase !== GAME_PHASES.SELECTING_END;
+
+  return (
+    <>
+      <Header />
+      <main className="box simulation-screen simulation-screen--compare">
+        <PhaseGuide />
+        <div className="simulation-layout simulation-layout--compare">
+          <ComparisonLayout />
+          <aside className="simulation-sidebar">
+            <DepthLegend />
+            {showAnimation && <ComparisonSummary />}
+            {showAnimation && <AnimationControls />}
+            <SimulationActions />
+          </aside>
+        </div>
+      </main>
+    </>
+  );
+}
+
 export function SimulationScreen() {
   useShipAnimation();
   const { state, dispatch, playSound } = useGame();
   const prevPhaseRef = useRef(state.phase);
+  const compare = isCompareMode(state);
 
   useEffect(() => {
     if (
@@ -174,10 +238,11 @@ export function SimulationScreen() {
     prevPhaseRef.current = state.phase;
   }, [state.phase, playSound]);
 
-  const showAnimation =
-    state.phase === GAME_PHASES.SEARCHING ||
-    state.phase === GAME_PHASES.FOUND ||
-    state.phase === GAME_PHASES.NO_PATH;
+  const showAnimation = compare
+    ? state.phase !== GAME_PHASES.IDLE && state.phase !== GAME_PHASES.SELECTING_END
+    : state.phase === GAME_PHASES.SEARCHING ||
+      state.phase === GAME_PHASES.FOUND ||
+      state.phase === GAME_PHASES.NO_PATH;
 
   if (!state.grid?.length || !state.grid[0]?.length) {
     return (
@@ -195,6 +260,10 @@ export function SimulationScreen() {
         </main>
       </>
     );
+  }
+
+  if (compare) {
+    return <CompareSimulationContent />;
   }
 
   return (

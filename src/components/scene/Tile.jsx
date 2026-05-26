@@ -1,22 +1,23 @@
 import { useRef, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
-import * as THREE from 'three';
 import { useGame } from '@/context/GameContext.jsx';
-import { CELL_TYPES, TILE_RADIUS, PLATFORM_THICKNESS } from '@/utils/constants.js';
+import { useSimulationSlice } from '@/context/SimulationSliceContext.jsx';
+import { CELL_TYPES, TILE_RADIUS, PLATFORM_THICKNESS, GAME_PHASES } from '@/utils/constants.js';
 import { getPlatformY, getTileAppearance, gridToWorld } from '@/utils/tileVisuals.js';
 
 export function Tile({ cell, gridWidth, gridHeight }) {
   const platformRef = useRef();
   const glowRef = useRef();
   const [hovered, setHovered] = useState(false);
-  const { handleCellClick, state } = useGame();
+  const { handleCellClick } = useGame();
+  const { globalPhase } = useSimulationSlice();
 
   const elevation = cell.elevation ?? 0;
   const platformY = getPlatformY(elevation);
   const { x, z } = gridToWorld(cell.i, cell.j, gridWidth, gridHeight);
   const appearance = getTileAppearance(cell);
   const isObstacle = cell.type === CELL_TYPES.OBSTACLE;
-  const clickable = state.phase !== 'searching' && !isObstacle;
+  const clickable = globalPhase !== GAME_PHASES.SEARCHING && !isObstacle;
 
   const platformColor = hovered && clickable ? '#5eead4' : appearance.platform;
   const pulse =

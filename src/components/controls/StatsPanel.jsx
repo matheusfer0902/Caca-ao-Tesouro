@@ -1,10 +1,18 @@
 import { useGame } from '@/context/GameContext.jsx';
+import { useSimulationSlice } from '@/context/SimulationSliceContext.jsx';
 import { GAME_PHASES } from '@/utils/constants.js';
 
-export function StatsPanel() {
+export function StatsPanel({ side, algorithm: algorithmOverride }) {
   const { state } = useGame();
-  const frontierLabel = state.algorithm === 'bfs' ? 'Tamanho da fila' : 'Tamanho da pilha';
-  const isNoPath = state.phase === GAME_PHASES.NO_PATH;
+  const slice = useSimulationSlice();
+
+  const isCompare = state.algorithm === 'compare' && side;
+  const phase = isCompare ? slice.phase : state.phase;
+  const stats = isCompare ? slice.stats : state.stats;
+  const algorithm = algorithmOverride ?? (isCompare ? side : state.algorithm);
+
+  const frontierLabel = algorithm === 'bfs' ? 'Tamanho da fila' : 'Tamanho da pilha';
+  const isNoPath = phase === GAME_PHASES.NO_PATH;
 
   const phaseLabels = {
     [GAME_PHASES.IDLE]: 'Aguardando navio...',
@@ -21,16 +29,16 @@ export function StatsPanel() {
   return (
     <div className={panelClass}>
       <span className="panel-title">Estatísticas</span>
-      <p className="phase-label">{phaseLabels[state.phase]}</p>
+      <p className="phase-label">{phaseLabels[phase]}</p>
       <p>
         <strong>Passos no caminho:</strong>{' '}
-        {isNoPath ? '—' : state.stats.stepsInPath}
+        {isNoPath ? '—' : stats.stepsInPath}
       </p>
       <p>
-        <strong>Nós explorados:</strong> {state.stats.nodesExplored}
+        <strong>Nós explorados:</strong> {stats.nodesExplored}
       </p>
       <p>
-        <strong>{frontierLabel}:</strong> {state.stats.frontierSize}
+        <strong>{frontierLabel}:</strong> {stats.frontierSize}
       </p>
       {isNoPath && (
         <p className="stats-no-path-note">

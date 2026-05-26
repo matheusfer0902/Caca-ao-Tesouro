@@ -1,16 +1,34 @@
 import { useSearchAnimation } from '@/hooks/useSearchAnimation.js';
+import { useComparisonSearchAnimation } from '@/hooks/useComparisonSearchAnimation.js';
 import { useGame } from '@/context/GameContext.jsx';
+import {
+  isCompareFinished,
+  isCompareMode,
+} from '@/context/SimulationSliceContext.jsx';
 import { MIN_ANIMATION_SPEED, MAX_ANIMATION_SPEED, GAME_PHASES } from '@/utils/constants.js';
 
 export function AnimationControls() {
   const { state, dispatch } = useGame();
-  const { togglePlay, stepForward, isSearching } = useSearchAnimation();
+  const singleAnim = useSearchAnimation();
+  const compareAnim = useComparisonSearchAnimation();
+
+  const compare = isCompareMode(state);
+  const { togglePlay, stepForward, isSearching } = compare ? compareAnim : singleAnim;
 
   const resetCamera = () => {
     window.dispatchEvent(new CustomEvent('reset-camera'));
   };
 
-  const locked = state.phase === GAME_PHASES.FOUND || state.phase === GAME_PHASES.NO_PATH;
+  const locked = compare
+    ? isCompareFinished(state)
+    : state.phase === GAME_PHASES.FOUND || state.phase === GAME_PHASES.NO_PATH;
+
+  const currentStep = compare
+    ? Math.max(
+        state.compare.bfs.animation.currentStep,
+        state.compare.dfs.animation.currentStep
+      )
+    : state.animation.currentStep;
 
   return (
     <div className="item control-panel animation-controls">
@@ -50,12 +68,12 @@ export function AnimationControls() {
           className="progress-fill"
           style={{
             width: state.animation.totalSteps
-              ? `${(state.animation.currentStep / state.animation.totalSteps) * 100}%`
-              : `${Math.min(state.animation.currentStep * 2, 100)}%`,
+              ? `${(currentStep / state.animation.totalSteps) * 100}%`
+              : `${Math.min(currentStep * 2, 100)}%`,
           }}
         />
       </div>
-      <span className="step-label">Passos executados: {state.animation.currentStep}</span>
+      <span className="step-label">Passos executados: {currentStep}</span>
     </div>
   );
 }

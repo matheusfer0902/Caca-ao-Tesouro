@@ -12,6 +12,7 @@ export function useSearchAnimation() {
   const searchSessionRef = useRef(null);
 
   speedRef.current = state.animation.speed;
+  const isCompare = state.algorithm === 'compare';
 
   const clearTimer = useCallback(() => {
     if (timerRef.current) {
@@ -21,7 +22,7 @@ export function useSearchAnimation() {
   }, []);
 
   const runStep = useCallback(() => {
-    if (!generatorRef.current) return;
+    if (isCompare || !generatorRef.current) return;
 
     const { value, done } = generatorRef.current.next();
 
@@ -45,16 +46,16 @@ export function useSearchAnimation() {
     }
 
     timerRef.current = setTimeout(runStep, speedRef.current);
-  }, [dispatch, playSound]);
+  }, [dispatch, playSound, isCompare]);
 
   const stepForward = useCallback(() => {
-    if (!generatorRef.current) return;
+    if (isCompare || !generatorRef.current) return;
     clearTimer();
     runStep();
-  }, [clearTimer, runStep]);
+  }, [clearTimer, runStep, isCompare]);
 
   const togglePlay = useCallback(() => {
-    if (state.phase !== GAME_PHASES.SEARCHING) return;
+    if (isCompare || state.phase !== GAME_PHASES.SEARCHING) return;
     if (state.animation.isPlaying) {
       dispatch({ type: 'PAUSE' });
       clearTimer();
@@ -64,9 +65,16 @@ export function useSearchAnimation() {
         timerRef.current = setTimeout(runStep, speedRef.current);
       }
     }
-  }, [clearTimer, dispatch, runStep, state.animation.isPlaying, state.phase]);
+  }, [clearTimer, dispatch, runStep, state.animation.isPlaying, state.phase, isCompare]);
 
   useEffect(() => {
+    if (isCompare) {
+      generatorRef.current = null;
+      searchSessionRef.current = null;
+      clearTimer();
+      return;
+    }
+
     if (state.phase !== GAME_PHASES.SEARCHING || !state.start || !state.end) {
       generatorRef.current = null;
       searchSessionRef.current = null;
@@ -94,9 +102,12 @@ export function useSearchAnimation() {
     state.animation.isPlaying,
     runStep,
     clearTimer,
+    isCompare,
   ]);
 
   useEffect(() => {
+    if (isCompare) return;
+
     if (
       state.phase === GAME_PHASES.SEARCHING &&
       state.animation.isPlaying &&
@@ -105,13 +116,13 @@ export function useSearchAnimation() {
     ) {
       timerRef.current = setTimeout(runStep, speedRef.current);
     }
-  }, [state.animation.isPlaying, state.animation.speed, state.phase, runStep]);
+  }, [state.animation.isPlaying, state.animation.speed, state.phase, runStep, isCompare]);
 
   useEffect(() => () => clearTimer(), [clearTimer]);
 
   return {
     stepForward,
     togglePlay,
-    isSearching: state.phase === GAME_PHASES.SEARCHING,
+    isSearching: !isCompare && state.phase === GAME_PHASES.SEARCHING,
   };
 }

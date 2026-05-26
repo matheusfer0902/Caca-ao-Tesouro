@@ -136,6 +136,14 @@ export function SetupScreen() {
                 <span className="card-label">DFS</span>
                 <span className="card-desc">Pilha — encontra um caminho válido</span>
               </button>
+              <button
+                type="button"
+                className={`algorithm-card ${algorithm === 'compare' ? 'selected' : ''}`}
+                onClick={() => setAlgorithm('compare')}
+              >
+                <span className="card-label">Comparação</span>
+                <span className="card-desc">BFS e DFS lado a lado — cronômetro e stats</span>
+              </button>
             </div>
           </section>
 
@@ -215,8 +223,9 @@ export function SetupScreen() {
                 {summary.levels === 1 ? 'nível' : 'níveis'}
               </p>
               <p>
-                <strong>Algoritmo:</strong> {algorithm.toUpperCase()} · <strong>Velocidade:</strong>{' '}
-                {speed}ms
+                <strong>Algoritmo:</strong>{' '}
+                {algorithm === 'compare' ? 'BFS vs DFS' : algorithm.toUpperCase()} ·{' '}
+                <strong>Velocidade:</strong> {speed}ms
               </p>
               <p className="summary-desc">{summary.desc}</p>
             </div>
